@@ -1,22 +1,54 @@
-use std::io::Write;
 use std::net::TcpStream;
-use std::io::Read;
+use std::thread;
+use std::io::{self, Read, Write};
 
 fn main(){
     let mut stream = TcpStream::connect("127.0.0.1:8888").unwrap();
     println!("Connected to server");
+    println!("Type messages and press Enter to send.");
+    println!("Type /quit to exit.");
 
-    let message = "Hello from the client";
-    stream.write_all(message.as_bytes()).unwrap();
+    let mut read_stream = stream.try_clone().unwrap();
 
-    println!("Message sent");
+    thread::spawn(move ||{
+       loop {
+           let mut buffer = [0; 1024];
 
-    let mut buffer = [0; 1024];
-    let bytes_read = stream.read(&mut buffer).unwrap();
+           let bytes_read = match read_stream.read(&mut buffer) {
+               Ok(0) => {
+                   println!("Server closed connection");
+                   return;
+               }
+               Ok(n) => n,
+               Err(e) => {
+                   println!("Failed to read from server: {}", e);
+                   return;
+               }
+           };
+           let message =  String::from_utf8_lossy(&buffer[..bytes_read]);
+           println!(
+               "Broadcast received: {}",
+               message
+           );
+       }
+    });
 
-    println!(
-        "Broadcast received: {}",
-        String::from_utf8_lossy(&buffer[..bytes_read])
-    );
+    loop {
+        let mut input = String::new();
+
+        io::stdin().read_line(&mut input).unwrap();
+        let trimmed = input.trim();
+
+        if trimmed == "/quit" {
+            println!("Disconnecting..");
+            break;
+        }
+
+        if trimmed.is_empty(){
+            continue;
+        }
+
+        stream.write_all(trimmed.as_bytes()).unwrap();
+    }
 
 }
