@@ -16,7 +16,17 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<TcpStr
     }
 
     let mut buffer = [0; 1024];
-    let bytes_read = stream.read(&mut buffer).unwrap();
+    let bytes_read = match stream.read(&mut buffer) {
+        Ok(0) => {
+            println!("Client {id} disconnected cleanly");
+            return;
+        }
+        Ok(n) => n,
+        Err(e) => {
+            println!("Client {id} read failed: {e}");
+            return;
+        }
+    };
 
     let message = String::from_utf8_lossy(&buffer[..bytes_read]);
     println!("Client {id} says: {}", message);
@@ -24,9 +34,15 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<TcpStr
     {
         let mut clients_list = clients.lock().unwrap();
 
-        for client_stream in clients_list.iter_mut() {
-            client_stream.write_all(message.as_bytes()).unwrap();
-        }
+        clients_list.retain_mut(|client_stream| {
+            match client_stream.write_all(message.as_bytes()) {
+                Ok(_) => true,
+                Err(e) => {
+                    println!("Removing dead client stream: {e}");
+                    false
+                }
+            }
+        });
     }
 }
 
