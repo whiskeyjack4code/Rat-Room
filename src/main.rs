@@ -1,3 +1,11 @@
+use std::net::TcpListener;
+
+const SOCKET: &str = "127.0.0.1:8888";
+
 fn main() {
-    println!("Rat-Room 2026");
+    let listener = TcpListener::bind("127.0.0.1:8888").unwrap();
+    println!("Server listening on {SOCKET}");
+
+    let (_stream, addr) = listener.accept().unwrap();
+    println!("Client connected from {addr}");
 }
