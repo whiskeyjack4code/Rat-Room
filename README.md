@@ -14,7 +14,7 @@ This started as a learning project to understand networking and concurrency prop
 * Users joining/leaving are announced
 * Duplicate usernames are rejected
 * `/who` shows who is currently connected
-* `/quit disconnects gracefully out of the session
+* `/quit` disconnects gracefully out of the session
 * Terminal UI for sending/receiving messages
 
 ---
