@@ -6,44 +6,63 @@ use std::thread;
 
 const SOCKET: &str = "127.0.0.1:8888";
 
-fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<TcpStream>>>) {
+struct Client {
+    id: usize,
+    username: String,
+    stream: TcpStream,
+}
+
+fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client>>>) {
+
+    let username = format!("user{}", id);
+
 
     {
         let mut clients_list = clients.lock().unwrap();
         let cloned_stream = stream.try_clone().unwrap();
-        clients_list.push(cloned_stream);
-        println!("Client {id} added. Total clients: {}", clients_list.len());
+
+        let client: Client = Client {
+            id,
+            username: username.clone(),
+            stream: cloned_stream,
+        };
+
+        clients_list.push(client);
+        println!("Username {username} joined. Total clients: {}", clients_list.len());
     }
 
     loop {
         let mut buffer = [0; 1024];
         let bytes_read = match stream.read(&mut buffer) {
             Ok(0) => {
-                println!("Client {id} disconnected cleanly");
+                println!("{username} disconnected cleanly");
                 return;
             }
             Ok(n) => n,
             Err(e) => {
-                println!("Client {id} read failed: {e}");
+                println!("{username} read failed: {e}");
                 return;
             }
         };
 
-        let message = String::from_utf8_lossy(&buffer[..bytes_read]);
-        println!("Client {id} says: {}", message);
+        let message = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+        let full_message = format!("{username}: {message}");
+        println!("{full_message}");
 
         {
             let mut clients_list = clients.lock().unwrap();
 
-            clients_list.retain_mut(|client_stream| {
-                match client_stream.write_all(message.as_bytes()) {
+            clients_list.retain_mut(|client| {
+                match client.stream.write_all(full_message.as_bytes()) {
                     Ok(_) => true,
                     Err(e) => {
-                        println!("Removing dead client stream: {e}");
+                        println!("Removing dead client {} (id={}): {e}", client.username, client.id);
                         false
                     }
                 }
             });
+
+            println!("Total clients after cleanup: {}", clients_list.len());
         }
     }
 }
