@@ -46,7 +46,7 @@ fn main(){
            };
            let message =  String::from_utf8_lossy(&buffer[..bytes_read]);
            println!(
-               "Broadcast received: {}",
+               "{}",
                message
            );
        }

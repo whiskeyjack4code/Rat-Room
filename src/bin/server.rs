@@ -45,6 +45,16 @@ fn remove_client(clients: &Arc<Mutex<Vec<Client>>>, id: usize) {
     println!("Client {id} removed immediately. Total clients: {}", client_list.len());
 }
 
+fn send_to_client(stream: &mut TcpStream, message: &str) -> bool {
+    match stream.write_all(message.as_bytes()) {
+        Ok(_) => true,
+        Err(e) => {
+            println!("Failed to send message to client: {e}");
+            false
+        }
+    }
+}
+
 fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client>>>) {
 
     let mut username_buffer = [0; 1024];
@@ -63,18 +73,29 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
     let username = String::from_utf8_lossy(&username_buffer[..username_bytes]).trim().to_string();
 
     {
+        let clients_list = clients.lock().unwrap();
+
+        if clients_list.iter().any(|client| client.username == username) {
+            let error_message = format!("[system] > Username '{username}'is already taken");
+            let _ = send_to_client(&mut stream, &error_message);
+
+            println!("Rejected duplicate username {username}");
+            return;
+        }
+    }
+    {
         let mut clients_list = clients.lock().unwrap();
         let cloned_stream = stream.try_clone().unwrap();
 
-        let client: Client = Client {
-            id,
-            username: username.clone(),
-            stream: cloned_stream,
-        };
+            let client: Client = Client {
+                id,
+                username: username.clone(),
+                stream: cloned_stream,
+            };
 
-        clients_list.push(client);
-        println!("Username {username} joined. Total clients: {}", clients_list.len());
-    }
+            clients_list.push(client);
+            println!("Username {username} joined. Total clients: {}", clients_list.len());
+        }
 
     let join_message = format!("[system] > {username} joined the chat");
     broadcast_message(&clients, &join_message, Some(id));
@@ -103,6 +124,21 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
         };
 
         let message = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+
+        if message == "/who" {
+            let user_list = {
+                let client_list = clients.lock().unwrap();
+                client_list.iter()
+                    .map(|client| client.username.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            };
+
+            let who_message = format!("[system] > Online users: {user_list}");
+            let _ = send_to_client(&mut stream, &who_message);
+            continue;
+        }
+
         let full_message = format!("{}: {}", username, message);
 
         println!("{full_message}");
