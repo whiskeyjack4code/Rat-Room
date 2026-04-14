@@ -65,6 +65,11 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
             let mut clients_list = clients.lock().unwrap();
 
             clients_list.retain_mut(|client| {
+
+                if client.id == id {
+                    return true;
+                }
+
                 match client.stream.write_all(full_message.as_bytes()) {
                     Ok(_) => true,
                     Err(e) => {
