@@ -12,6 +12,39 @@ struct Client {
     stream: TcpStream,
 }
 
+fn broadcast_message(
+    clients: &Arc<Mutex<Vec<Client>>>,
+    message: &str,
+    skip_id: Option<usize>,
+) {
+    let mut client_list = clients.lock().unwrap();
+    client_list.retain_mut(|client|{
+        if skip_id == Some(client.id) {
+            return true;
+        }
+
+        match client.stream.write_all(message.as_bytes()) {
+            Ok(_) => true,
+            Err(e) => {
+                println!(
+                    "Removing dead client {} (id={}): {e}",
+                    client.username, client.id
+                );
+                false
+            }
+        }
+    });
+    println!("Total number of clients after cleanup: {}", client_list.len());
+}
+
+fn remove_client(clients: &Arc<Mutex<Vec<Client>>>, id: usize) {
+    let mut client_list = clients.lock().unwrap();
+    client_list.retain_mut(|client|{
+        client.id != id
+    });
+    println!("Client {id} removed immediately. Total clients: {}", client_list.len());
+}
+
 fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client>>>) {
 
     let mut username_buffer = [0; 1024];
@@ -43,44 +76,38 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
         println!("Username {username} joined. Total clients: {}", clients_list.len());
     }
 
+    let join_message = format!("[system] > {username} joined the chat");
+    broadcast_message(&clients, &join_message, Some(id));
+
     loop {
         let mut buffer = [0; 1024];
         let bytes_read = match stream.read(&mut buffer) {
             Ok(0) => {
                 println!("{username} disconnected cleanly");
+                remove_client(&clients, id);
+
+                let leave_message = format!("[system] > {username} left the chat");
+                broadcast_message(&clients, &leave_message, Some(id));
+
                 return;
             }
             Ok(n) => n,
             Err(e) => {
                 println!("{username} read failed: {e}");
+                remove_client(&clients, id);
+
+                let leave_message = format!("[system] > {username} left the chat");
+                broadcast_message(&clients, &leave_message, Some(id));
                 return;
             }
         };
 
         let message = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
         let full_message = format!("{}: {}", username, message);
+
         println!("{full_message}");
 
-        {
-            let mut clients_list = clients.lock().unwrap();
-
-            clients_list.retain_mut(|client| {
-
-                if client.id == id {
-                    return true;
-                }
-
-                match client.stream.write_all(full_message.as_bytes()) {
-                    Ok(_) => true,
-                    Err(e) => {
-                        println!("Removing dead client {} (id={}): {e}", client.username, client.id);
-                        false
-                    }
-                }
-            });
-
-            println!("Total clients after cleanup: {}", clients_list.len());
-        }
+        broadcast_message(&clients, &full_message, Some(id));
     }
 }
 
