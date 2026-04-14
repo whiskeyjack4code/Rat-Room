@@ -14,8 +14,20 @@ struct Client {
 
 fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client>>>) {
 
-    let username = format!("user{}", id);
+    let mut username_buffer = [0; 1024];
+    let username_bytes = match stream.read(&mut username_buffer) {
+        Ok(0) => {
+            println!("Client {id} disconnected before sending a username");
+            return;
+        }
+        Ok(n) => n,
+        Err(e) => {
+            println!("Failed to read username from client: {id}: {e}");
+            return;
+        }
+    };
 
+    let username = String::from_utf8_lossy(&username_buffer[..username_bytes]).trim().to_string();
 
     {
         let mut clients_list = clients.lock().unwrap();

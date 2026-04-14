@@ -5,6 +5,25 @@ use std::io::{self, Read, Write};
 fn main(){
     let mut stream = TcpStream::connect("127.0.0.1:8888").unwrap();
     println!("Connected to server");
+
+    let username = loop {
+        let mut input = String::new();
+        println!("Enter your user-name: ");
+        io::stdin().read_line(&mut input).unwrap();
+
+        let trimmed = input.trim();
+
+        if trimmed.is_empty() {
+            println!("Username cannot be empty");
+            continue;
+        }
+        break trimmed.to_string()
+    };
+
+    stream.write_all(username.as_bytes()).unwrap();
+
+    println!("Welcome {username}!");
+
     println!("Type messages and press Enter to send.");
     println!("Type /quit to exit.");
 
