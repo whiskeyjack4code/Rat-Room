@@ -3,13 +3,25 @@ use std::io::{Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use serde::Deserialize;
+use std::fs;
 
-const SOCKET: &str = "127.0.0.1:8888";
+#[derive(Deserialize)]
+struct Config {
+    host: String,
+    port: u16,
+}
 
 struct Client {
     id: usize,
     username: String,
     stream: TcpStream,
+}
+
+fn load_config() -> Config {
+    let config_str = fs::read_to_string("config.toml").expect("config.toml not found");
+    toml::from_str(&config_str)
+        .expect("Failed to parse config.toml")
 }
 
 fn broadcast_message(
@@ -148,11 +160,14 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
 }
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8888").unwrap();
+    let config = load_config();
+    let addr = format!("{}:{}", config.host, config.port);
+    let listener = TcpListener::bind(&addr).expect("Failed to bind listener");
+
     let counter = Arc::new(AtomicUsize::new(1));
     let clients = Arc::new(Mutex::new(Vec::new()));
 
-    println!("Server listening on {SOCKET}");
+    println!("Server listening on {addr}");
 
     loop {
         let (stream, addr) = listener.accept().unwrap();

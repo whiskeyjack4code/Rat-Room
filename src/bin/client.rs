@@ -2,8 +2,9 @@ use std::error::Error;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::sync::mpsc;
-use std::thread;
+use std::{fs, thread};
 use std::time::Duration;
+use serde::Deserialize;
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -17,6 +18,18 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
 };
+
+#[derive(Deserialize)]
+struct Config {
+    host: String,
+    port: u16,
+}
+
+fn load_config() -> Config {
+    let config_str = fs::read_to_string("config.toml").expect("config.toml not found");
+    toml::from_str(&config_str)
+        .expect("Failed to parse config.toml")
+}
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
            stream: &mut TcpStream,
@@ -83,8 +96,10 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let config = load_config();
+    let addr = format!("{}:{}", config.host, config.port);
 
-    let mut stream = TcpStream::connect("127.0.0.1:8888").unwrap();
+    let mut stream = TcpStream::connect(&addr)?;
     println!("Connected to server");
 
     let username = loop {
