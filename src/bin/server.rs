@@ -46,7 +46,7 @@ fn handle_client(mut stream: TcpStream, id: usize, clients: Arc<Mutex<Vec<Client
         };
 
         let message = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
-        let full_message = format!("{username}: {message}");
+        let full_message = format!("{}: {}", username, message);
         println!("{full_message}");
 
         {
