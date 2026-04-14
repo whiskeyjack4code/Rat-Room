@@ -92,14 +92,9 @@ Inside the client:
 
 ## Example
 
-```text
-[system] sophie joined the chat
-dave: hello
-sophie: hi
-[system] dave left the chat
-[system] mick joined the chat
-mick: hello!
-```
+![Ratroom TUI](ratroom1.png)
+![Ratroom TUI](ratroom2.png)
+![Ratroom TUI](ratroom3.png)
 
 ---
 
